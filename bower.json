@@ -4,6 +4,12 @@
   "description": "PureScript bindings to node Events.",
   "license": "MIT",
   "dependencies": {
-    "purescript-events": "joneshf/purescript-events#~0.1.1"
+    "purescript-functions": "~0.1.0",
+    "purescript-eff": "~0.1.0",
+    "purescript-events": "DavidHarrison/purescript-events#5303740fb4100c878242f6707be1c5051fd5bc30"
+  },
+  "devDependencies": {
+    "purescript-console": "~0.1.0",
+    "purescript-foreign": "~0.5.1"
   }
 }
