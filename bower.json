@@ -1,7 +1,7 @@
 {
   "name": "purescript-node-events",
   "version": "0.2.0",
-  "description": "PureScript bindings to node Events.",
+  "description": "PureScript type classes and functions for Node EventEmitters. Based on joneshf/purescript-node-events.",
   "license": "MIT",
   "dependencies": {
     "purescript-functions": "~0.1.0",
