@@ -1,38 +1,52 @@
--- TODO: are we using `Int`s correctly
-module Node.Events where
+-- TODO: are we using `Int`s safely in FFI?
+-- TODO: Re-exports
+module Node.Events
+  ( EventEmitter, emitter
+  , Emits, event
+  , NewListener(..)
+  , RemoveListener(..)
+  , addListener
+  {-
+  , once
+  , removeListener
+  , removeListenersFor
+  , removeAllListeners
+  , setMaxListeners
+  , listeners
+  , emit
+  , newEventEmitter
+  , getDefaultMaxListeners
+  , setDefaultMaxListeners
+  , listenerCount
+  -}
+  ) where
 
 import Prelude
 
-import Data.Function.Multivariate(Fn(), Cons(), Nil(), Isomorphic())
-import Data.Nullable (toNullable)
-import Unsafe.Coerce (unsafeCoerce)
+import Control.Monad.Eff          (Eff())
+import Data.Function.Multivariate (Fn(), Cons(), Nil(), fromMulti)
+import Data.Iso                   (Iso())
+import Data.Maybe                 (Maybe(..))
+import Data.Nullable              (toNullable)
+import Data.Tuple                 (Tuple(..))
+import Unsafe.Coerce              (unsafeCoerce)
 
-import Node.Events.Types (EVENT(), Event(..), Listener())
-import Node.Events.Unsafe (EE(..))
+import Node.Events.Listener      (Listener())
+import Node.Events.Effect        (EVENT())
+import Node.Events.Unsafe.Event  (Event(..))
+import qualified Node.Events.Unsafe.Object as Obj
 
--- TODO: is this the right effect?
---       (we are just wrapping the function for equality's sake).
---       Is there an allocation effect or similar?
-foreign import mkListener :: forall args e ret eff.
-                             Fn args (Eff e Unit)
-                          -> Eff (event :: EVENT | eff) (Listener e args)
-
-toListener :: forall f e eff.
-              (Isomorphic f (Fn args (Eff e Unit)))
-           => f
-           -> Eff (event :: EVENT | eff) (Listener e args)
-toListener = mkListener <<< to
-
+-- Classes --------------------------------------------------------------------
 -- | `toObject` will generally be implemented as `unsafeCoerce`.
 class EventEmitter emitter where
-  toObject :: emitter -> EE
+  emitter :: emitter -> Obj.Emitter
 
-instance EventEmitter EE where
-  toObject = id
+instance eventEmitterEmitter :: EventEmitter Obj.Emitter where
+  emitter = id
 
 -- | NOTE: the combination of `event` and `args` should be unique.
 class (EventEmitter emitter) <= Emits emitter event args where
-  name :: event -> Event args
+  event :: event -> Event args
 
 -- API ------------------------------------------------------------------------
 -- Instance Methods -----------------------------------------------------------
@@ -42,25 +56,34 @@ addListener :: forall emitter event args eff.
             -> Listener eff args
             -> emitter
             -> Eff (e :: EVENT | eff) emitter
-addListener event listener emitter = addListener' event listener
-  where addListener' = mkEff' (toObject emitter).addListener
+addListener ev l em = addListener' (Tuple (event ev) (Tuple l unit))
+  where addListener' :: (Tuple (Event args) (Tuple (Listener eff args) Unit)) -> Eff (e :: EVENT | eff) emitter
+        addListener' = fromMulti $ mkEffFn $ Obj.addListener $ emitter em
 
+{-
 once :: forall emitter event args eff.
         (Emits emitter event args)
      => event
      -> Listener eff args
      -> emitter
      -> Eff (e :: EVENT | eff) emitter
-once event listener emitter = once' event lister
-  where addListener' = mkEff' (toObject emitter).once
+once event listener emitter = fromMulti (once' event listener)
+  where
+    once' :: event -> Listener eff args -> Fn args (Eff (e :: EVENT | eff) emitter)
+    once' = mkEffFn obj.once
+    obj = runEmitter (emitter 
 
 removeListener :: forall emitter event args eff.
                   (Emits emitter event args)
                => Listener eff args
                -> emitter
                -> Eff (e :: EVENT | eff) emitter
-removeListener listener emitter = removeListener' listener
-  where removeListener' = mkEff' (toObject emitter).removeListener
+removeListener listener emitter = fromMulti (removeListener' listener)
+  where
+    removeListener' :: Listener eff args -> Fn args (Eff (e :: EVENT | eff) emitter)
+    removeListener' = mkEffFn obj.removeListener
+    obj :: forall r. Emitter r
+    obj = toObject emitter
 
 removeListenersFor :: forall emitter event args eff.
                       (Emits emitter event args)
@@ -68,22 +91,22 @@ removeListenersFor :: forall emitter event args eff.
                    -> emitter
                    -> Eff (e :: EVENT | eff) emitter
 removeListenersFor event emitter = removeAllListeners' (toNullable (Just event))
-  where removeAllListeners' = mkEff' (toObject emitter).removeAllListeners
+  where removeAllListeners' = mkEffFn (toObject emitter).removeAllListeners
 
 removeAllListeners :: forall emitter eff.
                       (EventEmitter emitter)
                    => emitter
                    -> Eff (e :: EVENT | eff) emitter
 removeAllListeners emitter = removeAllListeners' (toNullable Nothing)
-  where removeAllListeners' = mkEff' (toObject emitter).removeAllListeners
+  where removeAllListeners' = mkEffFn (toObject emitter).removeAllListeners
 
 setMaxListeners :: forall emitter eff.
                    (EventEmitter emitter)
                 => Int
                 -> emitter
                 -> Eff (e :: EVENT | eff) emitter
-setMaxLiseners n emitter = setMaxListeners' n
-  where setMaxListeners' = mkEff' (toObject emitter).setMaxListeners
+setMaxListeners n emitter = setMaxListeners' n
+  where setMaxListeners' = mkEffFn (toObject emitter).setMaxListeners
 
 listeners :: forall emitter event args eff.
              (Emits emitter event args)
@@ -95,17 +118,16 @@ listeners event emitter = listeners' event
 
 -- TODO, move emitter to last argument?
 emit :: forall emitter event args eff.
-        ( Emits emitter event args
-        , Isomorphic (Fn args (Eff (e :: EVENT | eff) emitter)) f
-        )
-     => event
+        (Emits emitter event args)
+     => Iso f (Fn args (Eff (e :: EVENT | eff) emitter))
+     -> event
+     -> args
      -> emitter
-     -> f
-emit event emitter = emit' event
+emit event args emitter = emit' event
   where emit' = mkEff (toObject emitter).emit
 
 -- Class Methods --------------------------------------------------------------
-foreign import newEventEmitter :: forall eff. Eff (e :: EVENT | eff) EE
+foreign import newEventEmitter :: forall eff r. Eff (e :: EVENT | eff) Emitter
 
 foreign import getDefaultMaxListeners :: forall eff. Eff (e :: EVENT | eff) Int
 
@@ -118,36 +140,30 @@ foreign import listenerCount :: forall emitter event args eff.
                              => event
                              -> emitter
                              -> Int
+-}
 
 -- Universal Listeners --------------------------------------------------------
-data NewListener
-data RemoveListener
+data NewListener = NewListener
+data RemoveListener = RemoveListener
 
-type EventListener = forall args eff.
-                     Cons (Event args) (Cons (Listener eff args) Nil)
 
-instance (EventEmitter emitter) => Emits emitter NewListener EventListener where
-  name _ = "newListener"
+instance emitsNewListener :: (EventEmitter emitter)
+                          => Emits emitter
+                                   NewListener
+                                   (Tuple (Event args)
+                                          (Tuple (Listener eff args) Unit)) where
+  event _ = Event "newListener"
 
-instance (EventEmitter emitter) => Emits emitter RemoveListener EventListener where
-  name _ = "removeListener"
-
--- Listener Instances ---------------------------------------------------------
-
-foreign import listenerEq :: forall eff args.
-                             Listener eff args
-                          -> Listener eff args
-                          -> Boolean
-
-instance eqListener :: Eq (Listener eff args) where
-  eq = listenerEq
+instance emitsRemoveListener :: (EventEmitter emitter)
+                             => Emits emitter
+                                      RemoveListener
+                                      (Tuple (Event args)
+                                             (Tuple (Listener eff args) Unit)) where
+  event _ = Event "removeListener"
 
 -- Helper Functions -----------------------------------------------------------
 mkEff :: forall a eff. (Unit -> a) -> Eff eff a
 mkEff = unsafeCoerce
 
-mkEff' :: forall args ret eff.
-          (Isomorphic (Fn args (Eff eff ret)) f)
-       => Fn args ret
-       -> f
-mkEff' = to <<< map (mkEff <<< const)
+mkEffFn :: forall args ret eff. Fn args ret -> Fn args (Eff eff ret)
+mkEffFn = map (mkEff <<< const)

@@ -3,6 +3,8 @@
 
 // module Node.Events
 
+// Class Methods
+
 exports.newEventEmitter = function() {
   var EE = require('events').EventEmitter;
   return new EE();
@@ -21,20 +23,5 @@ exports.setDefaultMaxListeners = function(n) {
 exports.listenerCount = function(event) {
   return function(emitter) {
     require('events').EventEmiter.listenerCount(emitter, event);
-  }
-}
-
-// wrap a multivariate function for equality's sake
-exports.mkListener = function(fn) {
-  return function() {
-    return function() {
-      return fn.apply(null, arguments);
-    }
-  }
-}
-
-exports.listenerEq = function(a) {
-  return function(b) {
-    return a === b;
   }
 }

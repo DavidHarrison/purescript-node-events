@@ -6,7 +6,13 @@
   "dependencies": {
     "purescript-functions": "~0.1.0",
     "purescript-eff": "~0.1.0",
-    "purescript-events": "DavidHarrison/purescript-events#5303740fb4100c878242f6707be1c5051fd5bc30"
+    "purescript-events": "DavidHarrison/purescript-events#5303740fb4100c878242f6707be1c5051fd5bc30",
+    "purescript-multivariate": "DavidHarrison/purescript-multivariate#aa09a7fab5872a2f10d10bc6ea023eb54d583466",
+    "purescript-isomorphisms": "paf31/purescript-isomorphisms#0.1.0",
+    "purescript-aff": "~0.11.3",
+    "purescript-unsafe-coerce": "~0.1.0",
+    "purescript-nullable": "~0.2.1",
+    "purescript-exists": "DavidHarrison/purescript-exists#16a272536e7d45bac6592fdfca717efeee9eb45e"
   },
   "devDependencies": {
     "purescript-console": "~0.1.0",
